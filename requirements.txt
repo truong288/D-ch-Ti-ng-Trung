@@ -1,0 +1,6 @@
+python-telegram-bot==20.3
+deep-translator==1.11.4
+pypinyin==0.48.0
+pip install openpyxl
+openpyxl
+telegram

@@ -424,7 +424,7 @@ async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "❓ Lệnh không hợp lệ. Gõ /start để xem lệnh.\n\n"
         "🎮 game Caro:\u2003\u2003@Game_carobot\n"
         "🎮 Nối chữ:\u2003\u2003\u2003@noi_chu_bot\n"
-        "🀄 Google :\u2003\u2003@Dichngon_ngubot")
+        "🀄 Dịch Tiếng Trung:\u2003@Dichngon_ngubot")
 
 
 # ==== Khởi chạy Bot ====

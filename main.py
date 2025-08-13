@@ -8,8 +8,7 @@ from deep_translator import GoogleTranslator
 from pypinyin import pinyin, Style
 import openpyxl
 from openpyxl.utils import get_column_letter
-import logging
-logging.basicConfig(level=logging.DEBUG)
+print("Starting bot...")
 
 # ==== File cấu hình ====
 ADMIN_FILE = "admins.json"

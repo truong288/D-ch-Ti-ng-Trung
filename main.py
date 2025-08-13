@@ -6,9 +6,13 @@ from telegram.ext import (Application, CommandHandler, MessageHandler,
                           ContextTypes, filters, CallbackQueryHandler)
 from deep_translator import GoogleTranslator
 from pypinyin import pinyin, Style
-import openpyxl
 from openpyxl.utils import get_column_letter
+from stay_alive import keep_alive
+import openpyxl
 import hashlib
+
+
+keep_alive()
 
 # ==== File cấu hình ====
 ADMIN_FILE = "admins.json"

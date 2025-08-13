@@ -8,7 +8,7 @@ from deep_translator import GoogleTranslator
 from pypinyin import pinyin, Style
 import openpyxl
 from openpyxl.utils import get_column_letter
-print("Starting bot...")
+import hashlib
 
 # ==== File cấu hình ====
 ADMIN_FILE = "admins.json"
@@ -139,11 +139,24 @@ async def detect_and_translate(text, user_id=None):
 
 
 # ==== Gửi kết quả dịch ====
+def short_id(text):
+    return hashlib.md5(text.encode()).hexdigest()[:10]
+
 async def send_translation_with_save_button(update: Update,
                                             context: ContextTypes.DEFAULT_TYPE,
                                             text: str, result: dict):
+    # Tạo ID ngắn từ đoạn văn bản
+    key = short_id(text)
+
+    # Lưu tạm dữ liệu vào bot_data (RAM)
+    context.bot_data[key] = {
+        "text": text,
+        "translation": result["translation"]
+    }
+
+    # Tạo nút lưu với ID ngắn
     keyboard = [[
-        InlineKeyboardButton("💾 Lưu cụm từ này", callback_data=f"save_{text}")
+        InlineKeyboardButton("💾 Lưu cụm từ này", callback_data=f"save_{key}")
     ]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -164,15 +177,17 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data.startswith("save_"):
-        phrase = query.data[5:]
+        key = query.data[5:]
         user_id = query.from_user.id
-        original_message = query.message.text
-        translation = original_message.split("🔤 ")[1].split("\n")[0]
 
-        db.save_phrase(user_id, phrase, translation)
+        info = context.bot_data.get(key)
+        if not info:
+            await query.edit_message_text("❌ Không tìm thấy cụm từ để lưu.")
+            return
+
+        db.save_phrase(user_id, info["text"], info["translation"])
         await query.edit_message_text(
-            text=f"{original_message}\n\n✅ Đã lưu: '{phrase}'")
-
+            text=f"{query.message.text}\n\n✅ Đã lưu: '{info['text']}'")
 
 # ==== Xử lý lệnh từ người dùng ====
 async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

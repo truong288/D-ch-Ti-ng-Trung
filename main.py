@@ -1,15 +1,16 @@
-import os
+import os   #CHẠY OK
 import json
+import hashlib
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (Application, CommandHandler, MessageHandler,
                           ContextTypes, filters, CallbackQueryHandler)
 from deep_translator import GoogleTranslator
 from pypinyin import pinyin, Style
-from openpyxl.utils import get_column_letter
-from stay_alive import keep_alive
 import openpyxl
-import hashlib
+from openpyxl.utils import get_column_letter
+from telegram.ext import MessageHandler, filters
+from stay_alive import keep_alive
 
 
 keep_alive()
@@ -17,6 +18,7 @@ keep_alive()
 # ==== File cấu hình ====
 ADMIN_FILE = "admins.json"
 DB_FILE = "translation_db.json"
+TEMP_FILE = "temp_callback_data.json"
 
 
 # ==== Quản lý Admin ====
@@ -103,6 +105,29 @@ class TranslationDatabase:
 
 db = TranslationDatabase()
 
+# ==== Lưu trữ callback_data tạm bền vững ====
+
+
+def load_temp_data():
+    try:
+        with open(TEMP_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+
+def save_temp_data(data):
+    with open(TEMP_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+temp_data = load_temp_data()
+
+
+# ==== Hàm hỗ trợ tạo ID ngắn từ text ====
+def short_id(text):
+    return hashlib.md5(text.encode()).hexdigest()[:10]
+
 
 # ==== Dịch ngôn ngữ & Phiên âm ====
 async def translate_chunk(text):
@@ -142,23 +167,16 @@ async def detect_and_translate(text, user_id=None):
     return result
 
 
-# ==== Gửi kết quả dịch ====
-def short_id(text):
-    return hashlib.md5(text.encode()).hexdigest()[:10]
-
+# ==== Gửi kết quả dịch với nút lưu (callback_data đã lưu vào file) ====
 async def send_translation_with_save_button(update: Update,
                                             context: ContextTypes.DEFAULT_TYPE,
                                             text: str, result: dict):
-    # Tạo ID ngắn từ đoạn văn bản
     key = short_id(text)
 
-    # Lưu tạm dữ liệu vào bot_data (RAM)
-    context.bot_data[key] = {
-        "text": text,
-        "translation": result["translation"]
-    }
+    # Lưu bền callback data vào file
+    temp_data[key] = {"text": text, "translation": result["translation"]}
+    save_temp_data(temp_data)
 
-    # Tạo nút lưu với ID ngắn
     keyboard = [[
         InlineKeyboardButton("💾 Lưu cụm từ này", callback_data=f"save_{key}")
     ]]
@@ -175,7 +193,7 @@ async def send_translation_with_save_button(update: Update,
                                    reply_markup=reply_markup)
 
 
-# ==== Callback khi ấn nút "Lưu" ====
+# ==== Xử lý callback khi nhấn nút Lưu ====
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -184,7 +202,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         key = query.data[5:]
         user_id = query.from_user.id
 
-        info = context.bot_data.get(key)
+        info = temp_data.get(key)
         if not info:
             await query.edit_message_text("❌ Không tìm thấy cụm từ để lưu.")
             return
@@ -192,6 +210,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.save_phrase(user_id, info["text"], info["translation"])
         await query.edit_message_text(
             text=f"{query.message.text}\n\n✅ Đã lưu: '{info['text']}'")
+
 
 # ==== Xử lý lệnh từ người dùng ====
 async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -367,8 +386,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🀄 越中翻译机器人 - Bot dịch Trung Việt\n\n"
         "📌 Cách dùng:\n"
         "- Gửi văn bản tiếng Việt/Trung để tự động dịch.\n"
-        "- Nhấn nút 'Lưu' để lưu cụm từ.\n"
-        "- /save <cụm từ>: lưu thủ công.\n"
+        "- Nhấn nút 'Lưu' Để lưu cụm từ.\n"
+        "- /save <cụm từ>: Lưu thủ công.\n"
         "- /saved: Xem các cụm từ đã lưu.\n"
         "- /delete <cụm từ>: Xóa cụm từ đã lưu.\n"
         "- /find <từ khóa>: Tìm cụm từ đã lưu.\n"
@@ -379,7 +398,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "- /saved: 查看已保存的短语.\n"
         "- /delete <短语>: 删除已保存的短语.\n"
         "- /find <关键词>: 搜索已保存的短语.\n"
-        "- /history: 查看翻译历史.")
+        "- /history: 查看翻译历史.\n"
+        "👉 @xukaxuka2k1 code free,fastandsecure👈")
 
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -399,6 +419,14 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(admin_commands, parse_mode="Markdown")
 
 
+async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "❓ Lệnh không hợp lệ. Gõ /start để xem lệnh.\n\n"
+        "🎮 game Caro:\u2003\u2003@Game_carobot\n"
+        "🎮 Nối chữ:\u2003\u2003\u2003@noi_chu_bot\n"
+        "🀄 Google :\u2003\u2003@Dichngon_ngubot")
+
+
 # ==== Khởi chạy Bot ====
 def main():
     TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -415,6 +443,7 @@ def main():
             "addadmin", "removeadmin", "fast", "secure"
         ], handle_command))
     app.add_handler(CallbackQueryHandler(button_callback))
+    app.add_handler(MessageHandler(filters.COMMAND, unknown))
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
